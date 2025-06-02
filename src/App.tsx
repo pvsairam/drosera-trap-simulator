@@ -1,132 +1,34 @@
-// Drosera Trap Simulator with Tabs for LiveBoard
+// Drosera Trap Simulator with Tabs for LiveBoard and RealTimeSimulator
 import React, { useState, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import './index.css';
 import LiveBoard from './LiveBoard';
+import RealTimeSimulator from './RealTimeSimulator';
+import { pocPresets } from './pocPresets';
+
+type POCPreset = {
+  label: string;
+  logic: string;
+  event: string;
+};
 
 function App() {
-  const trapPresets = [
-    {
-      label: "🚨 Bridge Exploit",
-      logic: `async function trap(event) {
-  if (event.type === "bridge" && event.amount > 100000 && event.to === "0xdeadbeef") {
-    return "🚨 Potential bridge exploit!";
-  }
-}`,
-      event: `{
-  "type": "bridge",
-  "amount": 150000,
-  "to": "0xdeadbeef",
-  "timestamp": ${Date.now()}
-}`
-    },
-    {
-      label: "🌀 ETH High Slippage",
-      logic: `async function trap(event) {
-  if (event.token === "ETH" && event.amount > 1000 && event.slippage > 5) {
-    return "🌀 Large ETH swap with high slippage!";
-  }
-}`,
-      event: `{
-  "type": "swap",
-  "token": "ETH",
-  "amount": 1200,
-  "slippage": 7,
-  "timestamp": ${Date.now()}
-}`
-    },
-    {
-      label: "🌒 Off-Hour Transaction",
-      logic: `async function trap(event) {
-  const hour = new Date(event.timestamp).getUTCHours();
-  if (hour >= 0 && hour <= 3 && event.amount > 10000) {
-    return "🌒 Suspicious large txn during off-hours!";
-  }
-}`,
-      event: `{
-  "amount": 12000,
-  "timestamp": ${(() => {
-    const d = new Date();
-    d.setUTCHours(Math.floor(Math.random() * 4), 0, 0, 0);
-    return d.getTime();
-  })()}
-}`
-    },
-    {
-      label: "📉 Oracle Price Drop",
-      logic: `async function trap(event) {
-  if (event.asset === "BTC" && event.oraclePrice < 20000) {
-    return "📉 Oracle price dropped significantly!";
-  }
-}`,
-      event: `{
-  "type": "oracle",
-  "asset": "BTC",
-  "oraclePrice": 19500,
-  "timestamp": ${Date.now()}
-}`
-    },
-    {
-      label: "⚔️ AVS Slashing",
-      logic: `async function trap(event) {
-  if (event.avs === "staking" && event.slashAmount > 5000) {
-    return "⚔️ AVS slashing triggered!";
-  }
-}`,
-      event: `{
-  "type": "slashing",
-  "avs": "staking",
-  "slashAmount": 6000,
-  "timestamp": ${Date.now()}
-}`
-    },
-    {
-      label: "🛑 DEX Liquidity Drop",
-      logic: `async function trap(event) {
-  if (event.pool === "DEX-XYZ" && event.liquidityUSD < 1000000) {
-    return "🛑 Liquidity has dropped dangerously low on DEX!";
-  }
-}`,
-      event: `{
-  "type": "liquidity",
-  "pool": "DEX-XYZ",
-  "liquidityUSD": 800000,
-  "timestamp": ${Date.now()}
-}`
-    },
-    {
-      label: "🏦 Lending Collateral Event",
-      logic: `async function trap(event) {
-  if (event.collateralRatio < 1.2 && event.loanId) {
-    return "🏦 Lending collateral ratio below threshold!";
-  }
-}`,
-      event: `{
-  "type": "loan",
-  "loanId": "LN-1234",
-  "collateralRatio": 1.1,
-  "timestamp": ${Date.now()}
-}`
-    }
-  ];
+  const trapPresets: POCPreset[] = pocPresets;
 
   const presetIndexRef = useRef(0);
   const [trapLogic, setTrapLogic] = useState(trapPresets[0].logic);
   const [simulatedEvent, setSimulatedEvent] = useState(trapPresets[0].event);
   const [output, setOutput] = useState<{ triggered: boolean; message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'simulator' | 'liveboard'>('simulator');
+  const [activeTab, setActiveTab] = useState<'realtime' | 'simulator' | 'liveboard'>('realtime');
 
   const handleRunTrap = async () => {
     try {
       const event = JSON.parse(simulatedEvent);
       const fullCode = `(async () => { ${trapLogic}; return await trap(${JSON.stringify(event)}); })()`;
       const result = await eval(fullCode);
-
-      if (result) {
-        setOutput({ triggered: true, message: result });
-      } else {
-        setOutput({ triggered: false, message: "Trap NOT TRIGGERED" });
-      }
+      setOutput(result
+        ? { triggered: true, message: result }
+        : { triggered: false, message: "Trap NOT TRIGGERED" });
     } catch (error: any) {
       setOutput({ triggered: false, message: `Error: ${error.message}` });
     }
@@ -157,12 +59,13 @@ function App() {
       </div>
 
       <div className="flex justify-center gap-4 mb-6">
-        <button onClick={() => setActiveTab('simulator')} className={`px-4 py-2 rounded ${activeTab === 'simulator' ? 'bg-indigo-600' : 'bg-gray-700'}`}>Simulator</button>
+        <button onClick={() => setActiveTab('realtime')} className={`px-4 py-2 rounded ${activeTab === 'realtime' ? 'bg-indigo-600' : 'bg-gray-700'}`}>Simulator</button>
+        <button onClick={() => setActiveTab('simulator')} className={`px-4 py-2 rounded ${activeTab === 'simulator' ? 'bg-indigo-600' : 'bg-gray-700'}`}>POC Simulator</button>
         <button onClick={() => setActiveTab('liveboard')} className={`px-4 py-2 rounded ${activeTab === 'liveboard' ? 'bg-indigo-600' : 'bg-gray-700'}`}>Proof-of-Trap</button>
       </div>
 
       <main className="flex-grow px-6">
-        {activeTab === 'simulator' ? (
+        {activeTab === 'simulator' && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
@@ -197,7 +100,13 @@ function App() {
                   <option key={index} value={index}>{preset.label}</option>
                 ))}
               </select>
-              <span className="text-gray-300">(or)</span>
+
+              <div className="text-sm text-gray-400 mt-2 flex items-center gap-1">
+                <span>💡</span>
+                <span>Use a predefined trap preset or edit the logic and event to create your own simulation.</span>
+              </div>
+
+              <span className="text-gray-300 mt-1">(or)</span>
             </div>
 
             <div className="flex flex-wrap gap-4 justify-center mb-4">
@@ -222,9 +131,18 @@ function App() {
               </div>
             )}
           </>
-        ) : (
-          <LiveBoard />
         )}
+
+        {activeTab === 'liveboard' && <LiveBoard />}
+        {activeTab === 'realtime' && (
+  <>
+    <h2 className="text-lg text-yellow-300 font-semibold text-center mb-4">
+      💡 Use a predefined trap preset or edit the logic and event to create your own simulation.
+    </h2>
+    <RealTimeSimulator />
+  </>
+)}
+
       </main>
 
       <footer className="text-center text-sm text-gray-400 pb-4">
